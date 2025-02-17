@@ -1,21 +1,38 @@
-require('dotenv').config();
-const express = require('express');
-const { connectDB } = require('./config/connection');
-const path = require('path');
+const express = require("express");
+const { ApolloServer } = require("@apollo/server");
+const { expressMiddleware } = require("@apollo/server/express4");
+const cors = require("cors");
+const db = require("./config/connection");
+
+const typeDefs = require("./schemas/typeDefs");
+const resolvers = require("./schemas/resolvers");
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 4000;
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+// Create a new Apollo server instance
+const server = new ApolloServer({ typeDefs, resolvers });
 
-app.get('/', (req, res) => {
-  res.send('Welcome to Pickleball Meetup API!');
-});
+async function startServer() {
+  try {
+    await server.start();
 
-// Connect to database before starting server
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🌍 Server running on port ${PORT}!`);
-  });
-});
+    app.use(cors({ origin: "*" })); // Allow all origins (or specify frontend URL)
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
+
+    // Set up the GraphQL endpoint
+    app.use("/graphql", expressMiddleware(server));
+
+    db.once("open", () => {
+      app.listen(PORT, () => {
+        console.log(`🌍 Server running on port ${PORT}`);
+        console.log(`🚀 GraphQL API available at https://pickleball-meetup-score-tracker.onrender.com/graphql`);
+      });
+    });
+  } catch (error) {
+    console.error("🔥 Error starting server:", error);
+  }
+}
+
+startServer();
